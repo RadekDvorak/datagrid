@@ -9,14 +9,19 @@
 namespace Ublaboo\DataGrid;
 
 use Nette;
+use Nette\Application\UI\Form;
 use Nette\Application\UI\Link;
 use Nette\Application\UI\PresenterComponent;
-use Ublaboo\DataGrid\Utils\ArraysHelper;
-use Nette\Application\UI\Form;
 use Ublaboo\DataGrid\Exception\DataGridException;
 use Ublaboo\DataGrid\Exception\DataGridHasToBeAttachedToPresenterComponentException;
-use Ublaboo\DataGrid\Utils\Sorting;
+use Ublaboo\DataGrid\Filter\Mode\FilterAccessorClassMapFactory;
+use Ublaboo\DataGrid\Filter\Mode\IFilterAccessor;
+use Ublaboo\DataGrid\Filter\Mode\IFilterAccessorFactory;
 use Ublaboo\DataGrid\InlineEdit\InlineEdit;
+use Ublaboo\DataGrid\Utils\ArraysHelper;
+use Ublaboo\DataGrid\Utils\Sorting;
+
+
 
 /**
  * @method onRedraw()
@@ -290,14 +295,34 @@ class DataGrid extends Nette\Application\UI\Control
 	 */
 	protected $some_column_default_hide = FALSE;
 
+	/**
+	 * @var IFilterAccessorFactory
+	 */
+	private $filterAccessorFactory;
+
+	/**
+	 * @var string
+	 */
+	private $filterRenderingMode = NULL;
+
+
 
 	/**
 	 * @param Nette\ComponentModel\IContainer|NULL $parent
-	 * @param string                               $name
+	 * @param string $name
+	 * @param IFilterAccessorFactory $filterAccessorFactory
 	 */
-	public function __construct(Nette\ComponentModel\IContainer $parent = NULL, $name = NULL)
-	{
+	public function __construct(
+		Nette\ComponentModel\IContainer $parent = NULL,
+		$name = NULL,
+		IFilterAccessorFactory $filterAccessorFactory = NULL
+	) {
 		parent::__construct($parent, $name);
+		
+		if ($filterAccessorFactory === NULL) {
+			$filterAccessorFactory = new FilterAccessorClassMapFactory();
+		}
+		$this->filterAccessorFactory = $filterAccessorFactory;
 
 		$this->monitor('Nette\Application\UI\Presenter');
 
@@ -403,7 +428,7 @@ class DataGrid extends Nette\Application\UI\Control
 		$this->getTemplate()->add('columns', $this->getColumns());
 		$this->getTemplate()->add('actions', $this->actions);
 		$this->getTemplate()->add('exports', $this->exports);
-		$this->getTemplate()->add('filters', $this->filters);
+		$this->getTemplate()->add('filterAccessor', $this->filterAccessorFactory->createAccessor($this->getFilterRenderingMode(), $this));
 
 		$this->getTemplate()->add('filter_active', $this->isFilterActive());
 		$this->getTemplate()->add('original_template', $this->getOriginalTemplateFile());
@@ -1444,10 +1469,17 @@ class DataGrid extends Nette\Application\UI\Control
 	 * Should be datagrid filters rendered separately?
 	 * @param boolean $out
 	 * @return static
+	 * @deprecated Use setFilterRenderingMode for specific rendering mode
 	 */
 	public function setOuterFilterRendering($out = TRUE)
 	{
 		$this->outer_filter_rendering = (bool) $out;
+
+		$mode = $this->filterAccessorFactory->getLegacyInnerRenderingEquivalentMode();
+		if ($out) {
+			$mode = $this->filterAccessorFactory->getLegacyOuterRenderingEquivalentMode();
+		}
+		$this->filterRenderingMode = $mode;
 
 		return $this;
 	}
@@ -1456,10 +1488,35 @@ class DataGrid extends Nette\Application\UI\Control
 	/**
 	 * Are datagrid filters rendered separately?
 	 * @return boolean
+	 * @deprecated Use getFilterRenderingMode for specific rendering mode
 	 */
 	public function hasOuterFilterRendering()
 	{
 		return $this->outer_filter_rendering;
+	}
+
+
+	/**
+	 * @param string $mode
+	 * @return static
+	 */
+	public function setFilterRenderingMode($mode)
+	{
+		$this->filterRenderingMode = $mode;
+
+		$isLegacyOuterRendering = $mode === $this->filterAccessorFactory->getLegacyOuterRenderingEquivalentMode();
+		$this->outer_filter_rendering = $isLegacyOuterRendering;
+
+		return $this;
+	}
+
+
+	/**
+	 * @return string
+	 */
+	public function getFilterRenderingMode()
+	{
+		return $this->filterRenderingMode ?: $this->filterAccessorFactory->getLegacyInnerRenderingEquivalentMode();
 	}
 
 

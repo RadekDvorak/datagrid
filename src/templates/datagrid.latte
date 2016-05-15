@@ -2,7 +2,6 @@
  * @param array           $columns            Available columns
  * @param array           $actions            Available actions
  * @param array           $exports            Available exports
- * @param array           $filters            Available filters
  * @param Form            $filter             Walkaround for latte (does not know $form in snippet in foreach, etc)
  * @param Row[]           $rows               List of rows (each contain a item from data source)
  * @param DataGrid        $control            Parent (DataGrid)
@@ -11,6 +10,7 @@
  * @param array           $columns_visibility What columns are visible
  * @param InlineEdit|null $inlineEdit  Inline editing data
  * @param InlineEdit|null $inlineAdd   Inline add data
+ * @param IFilterAccessor $filterAccessor     Filter accessor based on rendering mode
  *}
 
 <div class="datagrid datagrid-{$control->getName()}">
@@ -23,10 +23,10 @@
 			{**
 			 * Filter form
 			 *}
-			{if $control->hasOuterFilterRendering()}
+			{if $filterAccessor->hasOuterFilters()}
 				<div class="row row-filters">
 					{var $i = 0}
-					<div class="col-sm-6" n:foreach="$filters as $f">
+					<div class="col-sm-6" n:foreach="$filterAccessor->getOuterFilters() as $f">
 						{**
 						 * Each fitler is rendered separately in its own template
 						 *}
@@ -157,20 +157,21 @@
 									</span>
 								{/ifset}
 
-								{if !$control->hasOuterFilterRendering() && isset($filters[$key])}
+								{if $filterAccessor->hasInnerFilter($key)}
 									<hr>
 									{var $i = $filter['filter'][$key]}
+									{var $columnFilter = $filterAccessor->getInnerFilter($key)}
 
-									{var $filter_block = 'filter-' . $filters[$key]->getKey()}
-									{var $filter_type_block = 'filtertype-' . $filters[$key]->getType()}
+									{var $filter_block = 'filter-' . $columnFilter->getKey()}
+									{var $filter_type_block = 'filtertype-' . $columnFilter->getType()}
 
 									{ifset #$filter_block}
-										{include #$filter_block, filter => $filters[$key], input => $i, outer => FALSE}
+										{include #$filter_block, filter => $columnFilter, input => $i, outer => FALSE}
 									{else}
 										{ifset #$filter_type_block}
-											{include #$filter_type_block, filter => $filters[$key], input => $i, outer => FALSE}
+											{include #$filter_type_block, filter => $columnFilter, input => $i, outer => FALSE}
 										{else}
-											{include $filters[$key]->getTemplate(), filter => $filters[$key], input => $i, outer => FALSE}
+											{include $columnFilter->getTemplate(), filter => $columnFilter, input => $i, outer => FALSE}
 										{/ifset}
 									{/ifset}
 
